@@ -37,6 +37,16 @@ class Entity {
 		componentMap.erase(&typeid(T));
 	}
 
+	template<typename T>
+	bool HasComponent() {
+		static_assert(std::is_base_of<Component, T>::value, "HasComponent needs a subclass of Component");
+		return componentMap.find(&typeid(T)) != componentMap.end();
+	}
+
+	bool HasComponent(const std::type_info* ti) {
+		return componentMap.find(ti) != componentMap.end();
+	}
+
 	std::vector<std::pair<const std::type_info*, Component*>> ComponentPairs() {
 		std::vector<std::pair<const std::type_info*, Component*>> components(componentMap.size());
 		std::copy(componentMap.begin(), componentMap.end(), components.begin());

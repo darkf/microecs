@@ -3,23 +3,21 @@
    Licensed under the terms of the zlib license
 */
 
-#ifndef _ECS_H
-#define _ECS_H
+#ifndef ECS_H
+#define ECS_H
 
-#include <iostream>
-#include <unordered_map>
-#include <vector>
+#include <algorithm>
 #include <typeinfo>
 #include <type_traits>
-using std::cout;
-using std::endl;
+#include <unordered_map>
+#include <vector>
 
 /* Components are data stores. They don't contain logic, they're just models. */
 class Component {};
 
 /* Entities are objects that are a bag of components */
 class Entity {
-	protected:
+	private:
 	std::unordered_map<const std::type_info*, Component*> componentMap;
 
 	public:
@@ -45,19 +43,17 @@ class Entity {
 	}
 
 	template<typename T>
-	bool HasComponent() {
+	bool HasComponent() const {
 		static_assert(std::is_base_of<Component, T>::value, "HasComponent needs a subclass of Component");
-		return componentMap.find(&typeid(T)) != componentMap.end();
+		return HasComponent(&typeid(T));
 	}
 
-	bool HasComponent(const std::type_info* ti) {
+	bool HasComponent(const std::type_info* ti) const {
 		return componentMap.find(ti) != componentMap.end();
 	}
 
-	std::vector<std::pair<const std::type_info*, Component*>> ComponentPairs() {
-		std::vector<std::pair<const std::type_info*, Component*>> components(componentMap.size());
-		std::copy(componentMap.begin(), componentMap.end(), components.begin());
-		return components;
+	std::vector<std::pair<const std::type_info*, Component*>> ComponentPairs() const {
+		return std::vector<std::pair<const std::type_info*, Component*>>(componentMap.begin(), componentMap.end());
 	}
 };
 
@@ -65,11 +61,16 @@ class Entity {
    specific component types, and performing logic on them.
 */
 
-// note: there is no type-check on the component types
-// so if they are not subclasses of Component, nothing will
-// error.
+template<typename Base, typename... Deriveds> struct is_base_of_all;
+template<typename Base, typename Derived, typename... Deriveds>
+struct is_base_of_all<Base, Derived, Deriveds...> :
+	std::integral_constant<bool, std::is_base_of<Base, Derived>::value && is_base_of_all<Base, Deriveds...>::value> {};
+template<typename Base>
+struct is_base_of_all<Base> : std::true_type {};
+
 template<typename... Components>
 class System {
+	static_assert(is_base_of_all<Component, Components...>::value, "All components need to be a subclass of Component.");
 	public:
 	std::vector<const std::type_info*> componentTypes;
 	System() : componentTypes {&typeid(Components)...} {}

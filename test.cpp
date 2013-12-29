@@ -21,16 +21,16 @@ class VelocitySystem : public System<PositionComponent, VelocityComponent> {
 	VelocitySystem() {}
 
 	void logic(Entity& e) {
-		auto pos = e.GetComponent<PositionComponent>();
-		auto vel = e.GetComponent<VelocityComponent>();
+		auto pos = e.get<PositionComponent>();
+		auto vel = e.get<VelocityComponent>();
 		pos->x += vel->vx;
 		pos->y += vel->vy;
 	}
 };
 
-void printPosVel(Entity& e) {
-	auto pos = e.GetComponent<PositionComponent>();
-	auto vel = e.GetComponent<VelocityComponent>();
+void printPosVel(Entity const& e) {
+	auto pos = e.get<PositionComponent>();
+	auto vel = e.get<VelocityComponent>();
 	cout << "pos: " << pos->x << ", " << pos->y << " ";
 	cout << "vel: " << vel->vx << ", " << vel->vy << endl;
 }
@@ -39,8 +39,8 @@ int main() {
 	VelocitySystem s;
 
 	Entity e;
-	e.AddComponent(new PositionComponent(32, 64));
-	e.AddComponent<VelocityComponent>(1, 2);
+	e.insert(new PositionComponent(32, 64));
+	e.emplace<VelocityComponent>(1, 2);
 
 	printPosVel(e);
 	s.process(e);

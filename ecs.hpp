@@ -29,41 +29,50 @@ class Entity {
 
 	public:
 	template<typename T>
-	T* GetComponent() const {
-		static_assert(std::is_base_of<Component, T>::value, "GetComponent needs a subclass of Component");
-		auto i = componentMap.find(&typeid(T));
+	T* get() const {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::get needs a subclass of Component");
+		return static_cast<T*>(get(&typeid(T)));
+	}
+
+	Component* get(const std::type_info* ti) const {
+		auto i = componentMap.find(ti);
 		if(i == componentMap.end())
 			return nullptr;
-		return static_cast<T*>(i->second.get());
+		return i->second.get();
 	}
 
 	template<typename T, typename... Args>
-	void AddComponent(Args&&... args) {
-		static_assert(std::is_base_of<Component, T>::value, "AddComponent needs a subclass of Component");
+	void emplace(Args&&... args) {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::emplace needs a subclass of Component");
 		auto ptr = new T(std::forward<Args>(args)...);
 		auto component = MakeComponentPtr(ptr);
 		componentMap.emplace(&typeid(T), std::move(component));
 	}
 
 	template<typename T>
-	void AddComponent(T* c) {
-		static_assert(std::is_base_of<Component, T>::value, "AddComponent needs a subclass of Component");
+	void insert(T* c) {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::insert needs a subclass of Component");
+		static_assert(!std::is_same<Component, T>::value, "Entity::insert needs a specific Component");
 		componentMap.emplace(&typeid(T), MakeComponentPtr(c));
 	}
 
 	template<typename T>
-	void RemoveComponent() {
-		static_assert(std::is_base_of<Component, T>::value, "RemoveComponent needs a subclass of Component");
-		componentMap.erase(&typeid(T));
+	void erase() {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::erase needs a subclass of Component");
+		erase(&typeid(T));
+	}
+
+	void erase(const std::type_info* ti) {
+		componentMap.erase(ti);
 	}
 
 	template<typename T>
-	bool HasComponent() const {
-		static_assert(std::is_base_of<Component, T>::value, "HasComponent needs a subclass of Component");
-		return HasComponent(&typeid(T));
+	bool contains() const {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::contains needs a subclass of Component");
+		return contains(&typeid(T));
 	}
 
-	bool HasComponent(const std::type_info* ti) const {
+	bool contains(const std::type_info* ti) const {
 		return componentMap.find(ti) != componentMap.end();
 	}
 };
@@ -83,12 +92,9 @@ struct is_base_of_all<Base, Derived, Deriveds...> :
 template<typename Base>
 struct is_base_of_all<Base> : std::true_type {};
 
-// note: there is no type-check on the component types
-// so if they are not subclasses of Component, nothing will
-// error.
 template<typename... Components>
 class System {
-	static_assert(is_base_of_all<Component, Components...>::value, "All components need to be a subclass of Component.");
+	static_assert(is_base_of_all<Component, Components...>::value, "All components need to be a subclass of Component");
 	public:
 	std::vector<const std::type_info*> componentTypes;
 	System() : componentTypes {&typeid(Components)...} {}
@@ -97,7 +103,7 @@ class System {
 	virtual void logic(Entity& e) = 0;
 
 	void process(Entity& e) {
-		if (std::all_of(std::begin(componentTypes), std::end(componentTypes), [&](auto type) { return e.HasComponent(type); }))
+		if (std::all_of(std::begin(componentTypes), std::end(componentTypes), [&](auto type) { return e.contains(type); }))
 			logic(e);
 	}
 

@@ -1,4 +1,8 @@
 #include "ecs.hpp"
+#include <iostream>
+
+using std::cout;
+using std::endl;
 
 class PositionComponent : public Component {
 	public:

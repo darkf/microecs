@@ -1,3 +1,8 @@
+/* Micro Entity-Component-System (ECS) framework
+   Copyright (c) 2013 darkf
+   Licensed under the terms of the zlib license
+*/
+
 #ifndef _ECS_H
 #define _ECS_H
 
@@ -9,8 +14,10 @@
 using std::cout;
 using std::endl;
 
+/* Components are data stores. They don't contain logic, they're just models. */
 class Component {};
 
+/* Entities are objects that are a bag of components */
 class Entity {
 	protected:
 	std::unordered_map<const std::type_info*, Component*> componentMap;
@@ -53,6 +60,10 @@ class Entity {
 		return components;
 	}
 };
+
+/* Systems are things that work on entities containing
+   specific component types, and performing logic on them.
+*/
 
 // note: there is no type-check on the component types
 // so if they are not subclasses of Component, nothing will

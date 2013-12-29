@@ -3,61 +3,119 @@
    Licensed under the terms of the zlib license
 */
 
-#ifndef _ECS_H
-#define _ECS_H
+#ifndef ECS_H
+#define ECS_H
 
-#include <iostream>
-#include <unordered_map>
-#include <vector>
+#include <boost/iterator/transform_iterator.hpp>
+
+#include <algorithm>
+#include <memory>
 #include <typeinfo>
 #include <type_traits>
-using std::cout;
-using std::endl;
+#include <unordered_map>
+#include <vector>
 
 /* Components are data stores. They don't contain logic, they're just models. */
 class Component {};
 
 /* Entities are objects that are a bag of components */
 class Entity {
-	protected:
-	std::unordered_map<const std::type_info*, Component*> componentMap;
+	using ComponentPtr = std::unique_ptr<Component, void(*)(Component*)>;
+	private:
+	struct HashTypeInfoReferents {
+		std::size_t operator()(const std::type_info* ti) const {
+			if (!ti)
+				return 0;
+			return ti->hash_code();
+		}
+	};
+
+	template<typename T>
+	struct EqualReferents {
+		bool operator()(T const* lhs, T const* rhs) const {
+			return lhs == rhs || (lhs && rhs && *lhs == *rhs);
+		}
+	};
+
+	using UnderlyingMap = std::unordered_map<const std::type_info*, ComponentPtr, HashTypeInfoReferents, EqualReferents<std::type_info>>;
+	UnderlyingMap componentMap;
+
+	template<typename T>
+	static ComponentPtr MakeComponentPtr(T* ptr) {
+		return ComponentPtr(ptr, [](Component* p) { delete static_cast<T*>(p); });
+	}
+
+	struct RemoveUnique {
+		std::pair<const std::type_info*, Component*> operator()(UnderlyingMap::const_reference p) const {
+			return {p.first, p.second.get()};
+		}
+	};
 
 	public:
+	using const_iterator = boost::transform_iterator<RemoveUnique, UnderlyingMap::const_iterator>;
+
 	template<typename T>
-	T* GetComponent() const {
-		static_assert(std::is_base_of<Component, T>::value, "GetComponent needs a subclass of Component");
-		auto i = componentMap.find(&typeid(T));
+	T* get() const {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::get needs a subclass of Component");
+		return static_cast<T*>(get(&typeid(T)));
+	}
+
+	Component* get(const std::type_info* ti) const {
+		auto i = componentMap.find(ti);
 		if(i == componentMap.end())
 			return nullptr;
-		return static_cast<T*>(i->second);
+		return i->second.get();
+	}
+
+	template<typename T, typename... Args>
+	void emplace(Args&&... args) {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::emplace needs a subclass of Component");
+		auto ptr = new T(std::forward<Args>(args)...);
+		auto component = MakeComponentPtr(ptr);
+		componentMap.emplace(&typeid(T), std::move(component));
 	}
 
 	template<typename T>
-	void AddComponent(T* c) {
-		static_assert(std::is_base_of<Component, T>::value, "AddComponent needs a subclass of Component");
-		componentMap.insert({&typeid(T), static_cast<Component*>(c)});
+	void insert(T* c) {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::insert needs a subclass of Component");
+		static_assert(!std::is_same<Component, T>::value, "Entity::insert needs a specific Component");
+		componentMap.emplace(&typeid(T), MakeComponentPtr(c));
 	}
 
 	template<typename T>
-	void RemoveComponent() {
-		static_assert(std::is_base_of<Component, T>::value, "RemoveComponent needs a subclass of Component");
-		componentMap.erase(&typeid(T));
+	void erase() {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::erase needs a subclass of Component");
+		erase(&typeid(T));
+	}
+
+	void erase(const std::type_info* ti) {
+		componentMap.erase(ti);
 	}
 
 	template<typename T>
-	bool HasComponent() {
-		static_assert(std::is_base_of<Component, T>::value, "HasComponent needs a subclass of Component");
-		return componentMap.find(&typeid(T)) != componentMap.end();
+	bool contains() const {
+		static_assert(std::is_base_of<Component, T>::value, "Entity::contains needs a subclass of Component");
+		return contains(&typeid(T));
 	}
 
-	bool HasComponent(const std::type_info* ti) {
+	bool contains(const std::type_info* ti) const {
 		return componentMap.find(ti) != componentMap.end();
 	}
 
-	std::vector<std::pair<const std::type_info*, Component*>> ComponentPairs() {
-		std::vector<std::pair<const std::type_info*, Component*>> components(componentMap.size());
-		std::copy(componentMap.begin(), componentMap.end(), components.begin());
-		return components;
+	const_iterator begin() const {
+		return cbegin();
+	}
+
+	const_iterator cbegin() const {
+		return boost::make_transform_iterator<RemoveUnique>(componentMap.begin());
+	}
+
+	const_iterator end() const {
+		return cend();
+	}
+
+	const_iterator cend() const {
+		return boost::make_transform_iterator<RemoveUnique>(componentMap.end());
 	}
 };
 
@@ -65,11 +123,20 @@ class Entity {
    specific component types, and performing logic on them.
 */
 
-// note: there is no type-check on the component types
-// so if they are not subclasses of Component, nothing will
-// error.
+template<typename Base, typename... Deriveds>
+struct is_base_of_all;
+
+template<typename Base, typename Derived, typename... Deriveds>
+struct is_base_of_all<Base, Derived, Deriveds...> :
+	std::integral_constant<bool, std::is_base_of<Base, Derived>::value && is_base_of_all<Base, Deriveds...>::value>
+{};
+
+template<typename Base>
+struct is_base_of_all<Base> : std::true_type {};
+
 template<typename... Components>
 class System {
+	static_assert(is_base_of_all<Component, Components...>::value, "All components need to be a subclass of Component");
 	public:
 	std::vector<const std::type_info*> componentTypes;
 	System() : componentTypes {&typeid(Components)...} {}
@@ -78,11 +145,8 @@ class System {
 	virtual void logic(Entity& e) = 0;
 
 	void process(Entity& e) {
-		for(auto type : componentTypes) {
-			if(!e.HasComponent(type))
-				return;
-		}
-		logic(e);
+		if (std::all_of(std::begin(componentTypes), std::end(componentTypes), [&](auto type) { return e.contains(type); }))
+			logic(e);
 	}
 
 	void process(std::vector<Entity>& entities) {

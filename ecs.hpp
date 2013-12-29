@@ -6,6 +6,8 @@
 #ifndef ECS_H
 #define ECS_H
 
+#include <boost/iterator/transform_iterator.hpp>
+
 #include <algorithm>
 #include <memory>
 #include <typeinfo>
@@ -20,14 +22,23 @@ class Component {};
 class Entity {
 	using ComponentPtr = std::unique_ptr<Component, void(*)(Component*)>;
 	private:
-	std::unordered_map<const std::type_info*, ComponentPtr> componentMap;
+	using UnderlyingMap = std::unordered_map<const std::type_info*, ComponentPtr>;
+	UnderlyingMap componentMap;
 
 	template<typename T>
 	static ComponentPtr MakeComponentPtr(T* ptr) {
 		return ComponentPtr(ptr, [](Component* p) { delete static_cast<T*>(p); });
 	}
 
+	struct RemoveUnique {
+		std::pair<const std::type_info*, Component*> operator()(UnderlyingMap::const_reference p) const {
+			return {p.first, p.second.get()};
+		}
+	};
+
 	public:
+	using const_iterator = boost::transform_iterator<RemoveUnique, decltype(componentMap)::const_iterator>;
+
 	template<typename T>
 	T* get() const {
 		static_assert(std::is_base_of<Component, T>::value, "Entity::get needs a subclass of Component");
@@ -74,6 +85,22 @@ class Entity {
 
 	bool contains(const std::type_info* ti) const {
 		return componentMap.find(ti) != componentMap.end();
+	}
+
+	const_iterator begin() const {
+		return cbegin();
+	}
+
+	const_iterator cbegin() const {
+		return boost::make_transform_iterator<RemoveUnique>(componentMap.begin());
+	}
+
+	const_iterator end() const {
+		return cend();
+	}
+
+	const_iterator cend() const {
+		return boost::make_transform_iterator<RemoveUnique>(componentMap.end());
 	}
 };
 

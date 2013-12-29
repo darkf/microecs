@@ -45,4 +45,7 @@ int main() {
 	printPosVel(e);
 	s.process(e);
 	printPosVel(e);
+
+	for (auto const& pair : e)
+		cout << pair.first->name() << " " << pair.second << "\n";
 }

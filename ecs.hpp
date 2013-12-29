@@ -54,4 +54,29 @@ class Entity {
 	}
 };
 
+// note: there is no type-check on the component types
+// so if they are not subclasses of Component, nothing will
+// error.
+template<typename... Components>
+class System {
+	public:
+	std::vector<const std::type_info*> componentTypes;
+	System() : componentTypes {&typeid(Components)...} {}
+
+	// where the magic happens
+	virtual void logic(Entity& e) = 0;
+
+	void process(Entity& e) {
+		for(auto type : componentTypes) {
+			if(!e.HasComponent(type))
+				return;
+		}
+		logic(e);
+	}
+
+	void process(std::vector<Entity>& entities) {
+		for(Entity& e : entities) process(e);
+	}
+};
+
 #endif

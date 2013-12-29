@@ -1,5 +1,6 @@
 #include <iostream>
 #include <unordered_map>
+#include <vector>
 #include <typeinfo>
 #include <type_traits>
 using std::cout;
@@ -44,6 +45,12 @@ class Entity {
 		static_assert(std::is_base_of<Component, T>::value, "RemoveComponent needs a subclass of Component");
 		componentMap.erase(&typeid(T));
 	}
+
+	std::vector<std::pair<const std::type_info*, Component*>> ComponentPairs() {
+		std::vector<std::pair<const std::type_info*, Component*>> components(componentMap.size());
+		std::copy(componentMap.begin(), componentMap.end(), components.begin());
+		return components;
+	}
 };
 
 int main() {
@@ -54,6 +61,7 @@ int main() {
 	auto vel = e.GetComponent<VelocityComponent>();
 	cout << pos->x << ", " << pos->y << endl;
 	cout << vel->vx << ", " << vel->vy << endl;
+	for(auto c : e.ComponentPairs()) cout << c.first->name() << endl;
 	delete pos;
 	delete vel;
 	return 0;

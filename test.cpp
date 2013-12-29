@@ -40,16 +40,9 @@ int main() {
 
 	Entity e;
 	e.AddComponent(new PositionComponent(32, 64));
-	e.AddComponent(new VelocityComponent(1, 2));
-
-	auto pos = e.GetComponent<PositionComponent>();
-	auto vel = e.GetComponent<VelocityComponent>();
+	e.AddComponent<VelocityComponent>(1, 2);
 
 	printPosVel(e);
 	s.process(e);
 	printPosVel(e);
-
-	delete pos;
-	delete vel;
-	return 0;
 }

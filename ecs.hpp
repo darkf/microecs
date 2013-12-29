@@ -7,6 +7,7 @@
 #define ECS_H
 
 #include <algorithm>
+#include <memory>
 #include <typeinfo>
 #include <type_traits>
 #include <unordered_map>
@@ -17,8 +18,14 @@ class Component {};
 
 /* Entities are objects that are a bag of components */
 class Entity {
+	using ComponentPtr = std::unique_ptr<Component, void(*)(Component*)>;
 	private:
-	std::unordered_map<const std::type_info*, Component*> componentMap;
+	std::unordered_map<const std::type_info*, ComponentPtr> componentMap;
+
+	template<typename T>
+	static ComponentPtr MakeComponentPtr(T* ptr) {
+		return ComponentPtr(ptr, [](Component* p) { delete static_cast<T*>(p); });
+	}
 
 	public:
 	template<typename T>
@@ -27,13 +34,21 @@ class Entity {
 		auto i = componentMap.find(&typeid(T));
 		if(i == componentMap.end())
 			return nullptr;
-		return static_cast<T*>(i->second);
+		return static_cast<T*>(i->second.get());
+	}
+
+	template<typename T, typename... Args>
+	void AddComponent(Args&&... args) {
+		static_assert(std::is_base_of<Component, T>::value, "AddComponent needs a subclass of Component");
+		auto ptr = new T(std::forward<Args>(args)...);
+		auto component = MakeComponentPtr(ptr);
+		componentMap.emplace(&typeid(T), std::move(component));
 	}
 
 	template<typename T>
 	void AddComponent(T* c) {
 		static_assert(std::is_base_of<Component, T>::value, "AddComponent needs a subclass of Component");
-		componentMap.emplace(&typeid(T), static_cast<Component*>(c));
+		componentMap.emplace(&typeid(T), MakeComponentPtr(c));
 	}
 
 	template<typename T>
@@ -50,10 +65,6 @@ class Entity {
 
 	bool HasComponent(const std::type_info* ti) const {
 		return componentMap.find(ti) != componentMap.end();
-	}
-
-	std::vector<std::pair<const std::type_info*, Component*>> ComponentPairs() const {
-		return std::vector<std::pair<const std::type_info*, Component*>>(componentMap.begin(), componentMap.end());
 	}
 };
 

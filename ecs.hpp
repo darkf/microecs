@@ -22,7 +22,22 @@ class Component {};
 class Entity {
 	using ComponentPtr = std::unique_ptr<Component, void(*)(Component*)>;
 	private:
-	using UnderlyingMap = std::unordered_map<const std::type_info*, ComponentPtr>;
+	struct HashTypeInfoReferents {
+		std::size_t operator()(const std::type_info* ti) const {
+			if (!ti)
+				return 0;
+			return ti->hash_code();
+		}
+	};
+
+	template<typename T>
+	struct EqualReferents {
+		bool operator()(T const* lhs, T const* rhs) const {
+			return lhs == rhs || (lhs && rhs && *lhs == *rhs);
+		}
+	};
+
+	using UnderlyingMap = std::unordered_map<const std::type_info*, ComponentPtr, HashTypeInfoReferents, EqualReferents<std::type_info>>;
 	UnderlyingMap componentMap;
 
 	template<typename T>
@@ -37,7 +52,7 @@ class Entity {
 	};
 
 	public:
-	using const_iterator = boost::transform_iterator<RemoveUnique, decltype(componentMap)::const_iterator>;
+	using const_iterator = boost::transform_iterator<RemoveUnique, UnderlyingMap::const_iterator>;
 
 	template<typename T>
 	T* get() const {

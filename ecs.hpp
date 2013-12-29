@@ -7,6 +7,7 @@
 #define ECS_H
 
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/mpl/and.hpp>
 
 #include <algorithm>
 #include <memory>
@@ -123,16 +124,8 @@ class Entity {
    specific component types, and performing logic on them.
 */
 
-template<typename Base, typename... Deriveds>
-struct is_base_of_all;
-
-template<typename Base, typename Derived, typename... Deriveds>
-struct is_base_of_all<Base, Derived, Deriveds...> :
-	std::integral_constant<bool, std::is_base_of<Base, Derived>::value && is_base_of_all<Base, Deriveds...>::value>
-{};
-
-template<typename Base>
-struct is_base_of_all<Base> : std::true_type {};
+template<typename Base, typename... Derived>
+using is_base_of_all = typename boost::mpl::and_<std::is_base_of<Base, Derived>...>::type;
 
 template<typename... Components>
 class System {

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <typeinfo>
+#include <type_traits>
 using std::cout;
 using std::endl;
 
@@ -25,6 +26,7 @@ class Entity {
 	public:
 	template<typename T>
 	T* GetComponent() const {
+		static_assert(std::is_base_of<Component, T>::value, "GetComponent needs a subclass of Component");
 		auto i = componentMap.find(&typeid(T));
 		if(i == componentMap.end())
 			throw "component not found";
@@ -33,14 +35,18 @@ class Entity {
 
 	template<typename T>
 	void AddComponent(T* c) {
+		static_assert(std::is_base_of<Component, T>::value, "AddComponent needs a subclass of Component");
 		componentMap.insert({&typeid(T), static_cast<Component*>(c)});
 	}
 
 	template<typename T>
 	void RemoveComponent() {
+		static_assert(std::is_base_of<Component, T>::value, "RemoveComponent needs a subclass of Component");
 		componentMap.erase(&typeid(T));
 	}
 };
+
+class X{};
 
 int main() {
 	Entity e;

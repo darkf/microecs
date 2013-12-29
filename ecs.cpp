@@ -29,7 +29,7 @@ class Entity {
 		static_assert(std::is_base_of<Component, T>::value, "GetComponent needs a subclass of Component");
 		auto i = componentMap.find(&typeid(T));
 		if(i == componentMap.end())
-			throw "component not found";
+			return nullptr;
 		return static_cast<T*>(i->second);
 	}
 
@@ -45,8 +45,6 @@ class Entity {
 		componentMap.erase(&typeid(T));
 	}
 };
-
-class X{};
 
 int main() {
 	Entity e;

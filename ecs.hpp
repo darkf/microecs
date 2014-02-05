@@ -41,13 +41,13 @@ class Entity {
 	void AddComponent(Args&&... args) {
 		static_assert(std::is_base_of<Component, T>::value, "AddComponent needs a subclass of Component");
 		auto component = MakeComponentPtr(new T(std::forward<Args>(args)...));
-		componentMap.insert({&typeid(T), std::move(component)});
+		componentMap.emplace(&typeid(T), std::move(component));
 	}
 
 	template<typename T>
 	void AddComponent(T* c) {
 		static_assert(std::is_base_of<Component, T>::value, "AddComponent needs a subclass of Component");
-		componentMap.insert({&typeid(T), MakeComponentPtr(c)});
+		componentMap.emplace(&typeid(T), MakeComponentPtr(c));
 	}
 
 	template<typename T>

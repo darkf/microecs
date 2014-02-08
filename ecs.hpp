@@ -28,6 +28,10 @@ class Entity {
 	}
 
 	public:
+	Entity() = default;
+	Entity(const Entity&) = delete;
+	Entity(Entity&& e) : componentMap(std::move(e.componentMap)) {}
+
 	template<typename T>
 	T* GetComponent() const {
 		static_assert(std::is_base_of<Component, T>::value, "GetComponent needs a subclass of Component");
